@@ -446,7 +446,8 @@ http_client = httpx.AsyncClient(
     timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
     limits=httpx.Limits(
         max_keepalive_connections=100,
-        max_connections=200
+        max_connections=200,
+        keepalive_expiry=300.0  # 保持连接300秒
     )
 )
 
@@ -458,7 +459,8 @@ http_client_chat = httpx.AsyncClient(
     timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
     limits=httpx.Limits(
         max_keepalive_connections=100,
-        max_connections=200
+        max_connections=200,
+        keepalive_expiry=300.0  # 保持连接300秒
     )
 )
 
@@ -470,7 +472,8 @@ http_client_auth = httpx.AsyncClient(
     timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
     limits=httpx.Limits(
         max_keepalive_connections=100,
-        max_connections=200
+        max_connections=200,
+        keepalive_expiry=300.0  # 保持连接300秒
     )
 )
 
@@ -1875,7 +1878,8 @@ async def admin_update_settings(request: Request, new_settings: dict = Body(...)
                 timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
                 limits=httpx.Limits(
                     max_keepalive_connections=100,
-                    max_connections=200
+                    max_connections=200,
+                    keepalive_expiry=300.0  # 保持连接300秒
                 )
             )
 
@@ -1887,7 +1891,8 @@ async def admin_update_settings(request: Request, new_settings: dict = Body(...)
                 timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
                 limits=httpx.Limits(
                     max_keepalive_connections=100,
-                    max_connections=200
+                    max_connections=200,
+                    keepalive_expiry=300.0  # 保持连接300秒
                 )
             )
 
@@ -1899,7 +1904,8 @@ async def admin_update_settings(request: Request, new_settings: dict = Body(...)
                 timeout=httpx.Timeout(TIMEOUT_SECONDS, connect=60.0),
                 limits=httpx.Limits(
                     max_keepalive_connections=100,
-                    max_connections=200
+                    max_connections=200,
+                    keepalive_expiry=300.0  # 保持连接300秒
                 )
             )
 
