@@ -2,8 +2,8 @@ services:
   gemini-api:
     image: cooooookk/gemini-business2api:latest
     container_name: gemini-business2api
-    # 使用host网络模式,让容器可以访问宿主机的127.0.0.1:1083代理
-    network_mode: "host"
+    ports:
+      - "7860:7860"
     volumes:
       - ./data:/app/data
     env_file:
@@ -22,6 +22,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # 环境变量:确保代理配置生效
-    environment:
-      - NO_PROXY=localhost,127.0.0.1
