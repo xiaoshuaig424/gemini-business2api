@@ -827,7 +827,7 @@ class GeminiAutomation:
         return None
 
     def _click_resend_code_button(self, page) -> bool:
-        """点击重新发送验证码按钮(增强版:支持多层嵌套和可见性检查)"""
+        """点击重新发送验证码按钮"""
         time.sleep(random.uniform(1.5, 3))
         try:
             page.listen.start(
@@ -839,138 +839,29 @@ class GeminiAutomation:
         except Exception:
             pass
 
-        # 扩展的关键词列表(支持中英文多种表达)
-        resend_keywords = [
-            "重新", "resend", "re-send", "send again",
-            "发送", "再次发送", "重发", "retry"
-        ]
-        
-        # CSS选择器备用方案
-        css_selectors = [
-            "button[aria-label*='resend' i]",
-            "button[aria-label*='重新' i]",
-            "button[aria-label*='send again' i]",
-            "button.resend-button",
-            "button#resend-code",
-        ]
-
-        def try_click_button(btn, source: str) -> bool:
-            """尝试点击按钮并验证结果(支持多种点击方式)"""
-            click_methods = [
-                ("常规点击", lambda: self._human_click(page, btn)),
-                ("JavaScript点击", lambda: page.run_js("arguments[0].click();", btn)),
-                ("直接点击", lambda: btn.click()),
-            ]
-            
-            for method_name, click_func in click_methods:
-                try:
-                    self._log("info", f"🔄 尝试{method_name} (来源: {source})")
-                    click_func()
-                    time.sleep(random.uniform(0.5, 1.0))
-                    
-                    network_ok = self._verify_code_send_by_network(page)
-                    ui_state = self._verify_code_send_status(page)
-                    
-                    if self._last_send_error or ui_state is False:
-                        self._last_send_confidence = "failed"
-                        self._log("warning", f"⚠️ {method_name}失败,尝试下一种方式")
-                        continue
-                    
-                    if network_ok or ui_state is True:
-                        self._last_send_confidence = "confirmed"
-                        self._log("info", f"✅ {method_name}成功")
-                        return True
-                    else:
-                        self._last_send_confidence = "unknown"
-                        self._log("info", f"✅ {method_name}完成(状态未知)")
-                        return True
-                        
-                except Exception as e:
-                    self._log("warning", f"⚠️ {method_name}异常: {e}")
-                    continue
-            
-            return False
-
-        # 方法1: 轮询查找按钮(最多尝试3次,每次间隔2秒)
-        for attempt in range(3):
-            if attempt > 0:
-                self._log("info", f"🔄 第 {attempt + 1}/3 次尝试查找重发按钮...")
-                time.sleep(2)
-            
-            # 1.1 通过CSS选择器查找
-            for selector in css_selectors:
-                try:
-                    btn = page.ele(selector, timeout=1)
-                    if btn:
-                        self._log("info", f"🔄 通过CSS选择器找到按钮: {selector}")
-                        if try_click_button(btn, f"CSS: {selector}"):
-                            self._stop_listen(page)
-                            return True
-                except Exception:
-                    continue
-            
-            # 1.2 通过文本关键词查找(不检查is_displayed,因为可能被嵌套)
-            try:
-                buttons = page.eles("tag:button", timeout=2)
-                self._log("info", f"🔍 页面共找到 {len(buttons)} 个按钮")
-                
-                for btn in buttons:
-                    try:
-                        text = (btn.text or "").strip()
-                        if not text:
-                            continue
-                        
-                        text_lower = text.lower()
-                        # 检查是否匹配任何关键词
-                        if any(kw in text_lower for kw in resend_keywords):
-                            self._log("info", f"🔄 通过文本找到按钮: '{text}'")
-                            if try_click_button(btn, f"文本: {text}"):
-                                self._stop_listen(page)
-                                return True
-                    except Exception:
-                        continue
-            except Exception as e:
-                self._log("warning", f"⚠️ 查找按钮异常: {e}")
-            
-            # 1.3 尝试通过XPath查找(处理嵌套情况)
-            try:
-                # 查找包含重发文本的任何元素,然后找最近的button祖先
-                xpath_patterns = [
-                    "//button[contains(text(), '重新发送')]",
-                    "//button[contains(text(), '重发')]",
-                    "//button[contains(text(), 'resend')]",
-                    "//button[contains(text(), 'Resend')]",
-                    "//*[contains(text(), '重新发送')]/ancestor::button",
-                    "//*[contains(text(), '重发')]/ancestor::button",
-                ]
-                for xpath in xpath_patterns:
-                    try:
-                        btn = page.ele(f"xpath:{xpath}", timeout=1)
-                        if btn:
-                            self._log("info", f"🔄 通过XPath找到按钮: {xpath}")
-                            if try_click_button(btn, f"XPath: {xpath}"):
-                                self._stop_listen(page)
-                                return True
-                    except Exception:
-                        continue
-            except Exception:
-                pass
-
-        # 方法2: 如果所有尝试都失败,记录页面状态用于调试
-        self._log("warning", "⚠️ 未找到重发按钮,尝试记录页面状态...")
+        # 查找包含重新发送关键词的按钮（与 _find_verify_button 相反）
         try:
-            # 记录当前URL
-            self._log("info", f"📍 当前URL: {page.url}")
-            # 保存截图
-            self._save_screenshot(page, "resend_button_not_found")
-            # 记录所有按钮文本(用于调试)
-            try:
-                all_buttons = page.eles("tag:button", timeout=2)
-                button_texts = [f"'{(btn.text or '').strip()}'" for btn in all_buttons[:10] if btn.text]
-                if button_texts:
-                    self._log("info", f"🔍 页面按钮文本示例: {', '.join(button_texts)}")
-            except Exception:
-                pass
+            buttons = page.eles("tag:button")
+            for btn in buttons:
+                text = (btn.text or "").strip().lower()
+                if text and ("重新" in text or "resend" in text):
+                    try:
+                        self._log("info", f"🔄 点击重新发送按钮")
+                        self._human_click(page, btn)
+                        network_ok = self._verify_code_send_by_network(page)
+                        ui_state = self._verify_code_send_status(page)
+                        if self._last_send_error or ui_state is False:
+                            self._last_send_confidence = "failed"
+                            self._stop_listen(page)
+                            return False
+                        if network_ok or ui_state is True:
+                            self._last_send_confidence = "confirmed"
+                        else:
+                            self._last_send_confidence = "unknown"
+                        self._stop_listen(page)
+                        return True
+                    except Exception:
+                        pass
         except Exception:
             pass
 
