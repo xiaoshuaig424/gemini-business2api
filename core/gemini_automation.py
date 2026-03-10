@@ -827,7 +827,7 @@ class GeminiAutomation:
         return None
 
     def _click_resend_code_button(self, page) -> bool:
-        """点击重新发送验证码按钮"""
+        """点击重新发送验证码按钮(增强版:支持多种定位方式和轮询等待)"""
         time.sleep(random.uniform(1.5, 3))
         try:
             page.listen.start(
@@ -839,29 +839,104 @@ class GeminiAutomation:
         except Exception:
             pass
 
-        # 查找包含重新发送关键词的按钮（与 _find_verify_button 相反）
-        try:
-            buttons = page.eles("tag:button")
-            for btn in buttons:
-                text = (btn.text or "").strip().lower()
-                if text and ("重新" in text or "resend" in text):
-                    try:
-                        self._log("info", f"🔄 点击重新发送按钮")
-                        self._human_click(page, btn)
-                        network_ok = self._verify_code_send_by_network(page)
-                        ui_state = self._verify_code_send_status(page)
-                        if self._last_send_error or ui_state is False:
-                            self._last_send_confidence = "failed"
+        # 扩展的关键词列表(支持中英文多种表达)
+        resend_keywords = [
+            "重新", "resend", "re-send", "send again",
+            "发送", "再次发送", "重发", "retry"
+        ]
+        
+        # CSS选择器备用方案
+        css_selectors = [
+            "button[aria-label*='resend' i]",
+            "button[aria-label*='重新' i]",
+            "button[aria-label*='send again' i]",
+            "button.resend-button",
+            "button#resend-code",
+        ]
+
+        # 方法1: 轮询查找按钮(最多尝试3次,每次间隔2秒)
+        for attempt in range(3):
+            if attempt > 0:
+                self._log("info", f"🔄 第 {attempt + 1}/3 次尝试查找重发按钮...")
+                time.sleep(2)
+            
+            # 1.1 通过CSS选择器查找
+            for selector in css_selectors:
+                try:
+                    btn = page.ele(selector, timeout=1)
+                    if btn and btn.is_displayed():
+                        self._log("info", f"🔄 通过CSS选择器找到重发按钮: {selector}")
+                        try:
+                            self._human_click(page, btn)
+                            network_ok = self._verify_code_send_by_network(page)
+                            ui_state = self._verify_code_send_status(page)
+                            if self._last_send_error or ui_state is False:
+                                self._last_send_confidence = "failed"
+                                self._stop_listen(page)
+                                return False
+                            if network_ok or ui_state is True:
+                                self._last_send_confidence = "confirmed"
+                            else:
+                                self._last_send_confidence = "unknown"
                             self._stop_listen(page)
-                            return False
-                        if network_ok or ui_state is True:
-                            self._last_send_confidence = "confirmed"
-                        else:
-                            self._last_send_confidence = "unknown"
-                        self._stop_listen(page)
-                        return True
+                            return True
+                        except Exception as e:
+                            self._log("warning", f"⚠️ CSS选择器按钮点击失败: {e}")
+                except Exception:
+                    continue
+            
+            # 1.2 通过文本关键词查找
+            try:
+                buttons = page.eles("tag:button", timeout=2)
+                self._log("info", f"🔍 页面共找到 {len(buttons)} 个按钮")
+                
+                for btn in buttons:
+                    try:
+                        if not btn.is_displayed():
+                            continue
+                        text = (btn.text or "").strip().lower()
+                        if not text:
+                            continue
+                        
+                        # 检查是否匹配任何关键词
+                        if any(kw in text for kw in resend_keywords):
+                            self._log("info", f"🔄 通过文本找到重发按钮: '{text}'")
+                            try:
+                                self._human_click(page, btn)
+                                network_ok = self._verify_code_send_by_network(page)
+                                ui_state = self._verify_code_send_status(page)
+                                if self._last_send_error or ui_state is False:
+                                    self._last_send_confidence = "failed"
+                                    self._stop_listen(page)
+                                    return False
+                                if network_ok or ui_state is True:
+                                    self._last_send_confidence = "confirmed"
+                                else:
+                                    self._last_send_confidence = "unknown"
+                                self._stop_listen(page)
+                                return True
+                            except Exception as e:
+                                self._log("warning", f"⚠️ 文本按钮点击失败: {e}")
                     except Exception:
-                        pass
+                        continue
+            except Exception as e:
+                self._log("warning", f"⚠️ 查找按钮异常: {e}")
+
+        # 方法2: 如果所有尝试都失败,记录页面状态用于调试
+        self._log("warning", "⚠️ 未找到重发按钮,尝试记录页面状态...")
+        try:
+            # 记录当前URL
+            self._log("info", f"📍 当前URL: {page.url}")
+            # 保存截图
+            self._save_screenshot(page, "resend_button_not_found")
+            # 记录所有按钮文本(用于调试)
+            try:
+                all_buttons = page.eles("tag:button", timeout=2)
+                button_texts = [f"'{(btn.text or '').strip()}'" for btn in all_buttons[:10] if btn.text]
+                if button_texts:
+                    self._log("info", f"🔍 页面按钮文本示例: {', '.join(button_texts)}")
+            except Exception:
+                pass
         except Exception:
             pass
 
