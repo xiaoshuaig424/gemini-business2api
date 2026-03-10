@@ -855,23 +855,41 @@ class GeminiAutomation:
         ]
 
         def try_click_button(btn, source: str) -> bool:
-            """尝试点击按钮并验证结果"""
-            try:
-                self._log("info", f"🔄 尝试点击按钮 (来源: {source})")
-                self._human_click(page, btn)
-                network_ok = self._verify_code_send_by_network(page)
-                ui_state = self._verify_code_send_status(page)
-                if self._last_send_error or ui_state is False:
-                    self._last_send_confidence = "failed"
-                    return False
-                if network_ok or ui_state is True:
-                    self._last_send_confidence = "confirmed"
-                else:
-                    self._last_send_confidence = "unknown"
-                return True
-            except Exception as e:
-                self._log("warning", f"⚠️ 按钮点击失败: {e}")
-                return False
+            """尝试点击按钮并验证结果(支持多种点击方式)"""
+            click_methods = [
+                ("常规点击", lambda: self._human_click(page, btn)),
+                ("JavaScript点击", lambda: page.run_js("arguments[0].click();", btn)),
+                ("直接点击", lambda: btn.click()),
+            ]
+            
+            for method_name, click_func in click_methods:
+                try:
+                    self._log("info", f"🔄 尝试{method_name} (来源: {source})")
+                    click_func()
+                    time.sleep(random.uniform(0.5, 1.0))
+                    
+                    network_ok = self._verify_code_send_by_network(page)
+                    ui_state = self._verify_code_send_status(page)
+                    
+                    if self._last_send_error or ui_state is False:
+                        self._last_send_confidence = "failed"
+                        self._log("warning", f"⚠️ {method_name}失败,尝试下一种方式")
+                        continue
+                    
+                    if network_ok or ui_state is True:
+                        self._last_send_confidence = "confirmed"
+                        self._log("info", f"✅ {method_name}成功")
+                        return True
+                    else:
+                        self._last_send_confidence = "unknown"
+                        self._log("info", f"✅ {method_name}完成(状态未知)")
+                        return True
+                        
+                except Exception as e:
+                    self._log("warning", f"⚠️ {method_name}异常: {e}")
+                    continue
+            
+            return False
 
         # 方法1: 轮询查找按钮(最多尝试3次,每次间隔2秒)
         for attempt in range(3):
